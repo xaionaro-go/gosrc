@@ -23,6 +23,11 @@ func (field *Field) IsPointer() bool {
 	return ok
 }
 
+func (field *Field) IsSlice() bool {
+	_, ok := TypeDeepest(field.TypeValue.Type).(*types.Slice)
+	return ok
+}
+
 func (field *Field) TypeElem() types.Type {
 	return TypeElem(field.TypeValue.Type)
 }

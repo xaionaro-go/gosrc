@@ -13,6 +13,7 @@ import (
 )
 
 var magicGoGenerateComment = regexp.MustCompile(`go:generate ([0-9A-Za-z_\.]+)`)
+var magicBuildTagsComment = regexp.MustCompile(`\+build (.*)`)
 
 type File struct {
 	Path    string
@@ -32,6 +33,46 @@ func newFile(fileSet *token.FileSet, path string) (*File, error) {
 		Path: path,
 		Ast:  parsedFile,
 	}, nil
+}
+
+func (file File) IsPassBuildTags(haveBuildTags []string) bool {
+	have := map[string]bool{}
+	for _, buildTag := range haveBuildTags {
+		have[buildTag] = true
+	}
+
+	for _, commentGroup := range file.Ast.Comments {
+		for _, comment := range commentGroup.List {
+			buildTagsMatches := magicBuildTagsComment.FindStringSubmatch(comment.Text)
+			if len(buildTagsMatches) < 2 {
+				continue
+			}
+			combinations := strings.Split(strings.TrimSpace(buildTagsMatches[1]), ",")
+			for _, combination := range combinations {
+				requiredBuildTags := strings.Split(strings.TrimSpace(combination), " ")
+				satisfied := true
+				for _, requiredBuildTag := range requiredBuildTags {
+					if strings.HasSuffix(requiredBuildTag, "!") {
+						shouldAbsentBuildTag := strings.TrimSpace(requiredBuildTag[:1])
+						if have[shouldAbsentBuildTag] {
+							satisfied = false
+							break
+						}
+					} else {
+						if !have[requiredBuildTag] {
+							satisfied = false
+							break
+						}
+					}
+				}
+				if !satisfied {
+					return false
+				}
+			}
+		}
+	}
+
+	return true
 }
 
 func (file File) GoGenerateTags() []string {
@@ -174,4 +215,16 @@ func (files Files) FindByPath(path string) *File {
 		}
 	}
 	return nil
+}
+
+func (files Files) FilterByBuildTags(buildTags []string) Files {
+	var result Files
+	for _, file := range files {
+		if !file.IsPassBuildTags(buildTags) {
+			continue
+		}
+		result = append(result, file)
+	}
+
+	return result
 }

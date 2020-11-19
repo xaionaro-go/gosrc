@@ -10,18 +10,6 @@ import (
 	"strings"
 )
 
-func closestDir(in string) (string, error) {
-	stat, err := os.Stat(in)
-	if err != nil {
-		return "", err
-	}
-	if stat.IsDir() {
-		return in, nil
-	}
-	dir, _ := path.Split(in)
-	return dir, nil
-}
-
 func scanForFiles(fileSet *token.FileSet, dirPath string, isRecursive bool) (Files, error) {
 	var goFiles Files
 

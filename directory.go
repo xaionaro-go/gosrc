@@ -1,16 +1,17 @@
 package gosrc
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/importer"
 	"go/token"
 	"go/types"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
+
+	"github.com/xaionaro-go/unsafetools"
 )
 
 type Directory struct {
@@ -18,51 +19,87 @@ type Directory struct {
 	Packages Packages
 }
 
-func OpenDirectoryByGoPath(
+func normalizePkgPath(
+	path string,
 	lookupPaths []string,
-	goPath string,
+) (pkgPath string, dirPath string, err error) {
+	defer func() {
+		if err != nil {
+			return
+		}
+
+		var st os.FileInfo
+		st, err = os.Stat(dirPath)
+		if err != nil {
+			err = fmt.Errorf("unable to stat() on path '%s': %w", dirPath, err)
+			return
+		}
+
+		if !st.IsDir() {
+			pkgPath = filepath.Base(pkgPath)
+			dirPath = filepath.Base(dirPath)
+		}
+	}()
+	if filepath.IsAbs(path) {
+		return path, path, nil
+	}
+	parts := strings.Split(path, string(filepath.Separator))
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", "", fmt.Errorf("unable to get workdir: %w", err)
+	}
+	for _, lookupPath := range lookupPaths {
+		if !strings.HasPrefix(wd, lookupPath) {
+			continue
+		}
+		parts[0] = wd[len(lookupPath):]
+		if parts[0] == "" {
+			parts = parts[1:]
+		}
+		pkgPath := strings.Join(parts, string(filepath.Separator))
+		pkgPath = strings.Trim(pkgPath, string(filepath.Separator))
+		return pkgPath, filepath.Join(lookupPath, pkgPath), nil
+	}
+
+	for _, lookupPath := range lookupPaths {
+		dirPath := filepath.Join(lookupPath, path)
+		if _, err := os.Stat(dirPath); err == nil {
+			return path, dirPath, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("unable to find directory '%s' in paths %v", path, lookupPaths)
+}
+
+func OpenDirectoryByPkgPath(
+	buildCtx *build.Context,
+	pkgPath string,
 	includeTestPkg bool,
 	onlyFiles bool,
 	externalImporter Importer,
 ) (*Directory, error) {
-	var dirPath string
-	var pkgPath string
 	var lookupPath string
-
-	for _, lookupPath = range lookupPaths {
-		var err error
-		candidate := filepath.Join(lookupPath, goPath)
-		dirPath, err = closestDir(candidate)
-		var pathError *os.PathError
-		if errors.As(err, &pathError) && pathError.Err == syscall.ENOENT {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("unable to find directory of '%s': %w", candidate, err)
-		}
-		if lookupPath == "." {
-			lookupPath = ""
-		}
-		pkgPath = strings.Trim(dirPath[len(lookupPath):], string(filepath.Separator))
-		break
+	pkgPath, dirPath, err := normalizePkgPath(pkgPath, buildCtx.SrcDirs())
+	if err != nil {
+		return nil, fmt.Errorf("unable to normalize pkg path '%s': %w", pkgPath, err)
 	}
 
 	directory := &Directory{FileSet: token.NewFileSet()}
 
 	if dirPath == `` {
 		if externalImporter != nil { // TODO: remove this hack
-			pkg, err := externalImporter.Import(goPath)
+			pkg, err := externalImporter.Import(pkgPath)
 			if err != nil {
 				return nil, fmt.Errorf("unable to import '%s': %w",
-					goPath, err)
+					pkgPath, err)
 			}
 			directory.Packages = append(directory.Packages, pkg)
 			return directory, nil
 		}
 
 		return nil, ErrPackageNotFound{
-			GoPath:      goPath,
-			LookupPaths: lookupPaths,
+			GoPath:      pkgPath,
+			LookupPaths: buildCtx.SrcDirs(),
 		}
 	}
 
@@ -78,7 +115,8 @@ func OpenDirectoryByGoPath(
 	var conf types.Config
 	var pkgRaw *types.Package
 	if !onlyFiles {
-		conf = types.Config{Importer: importer.For("source", nil)}
+		conf = types.Config{Importer: importer.ForCompiler(token.NewFileSet(), "source", nil)}
+		*(unsafetools.FieldByName(conf.Importer, "ctxt").(**build.Context)) = buildCtx
 		pkgRaw, err = conf.Importer.Import(pkgPath)
 		if err != nil {
 			return nil, fmt.Errorf("unable to import package '%s' (in: '%s'): %w", pkgPath, dirPath, err)
@@ -98,7 +136,7 @@ func OpenDirectoryByGoPath(
 		}
 
 		var fileAsts []*ast.File
-		for _, file := range pkgFiles {
+		for _, file := range pkgFiles.FilterByBuildTags(buildCtx.BuildTags) {
 			file.Package = pkg
 			fileAsts = append(fileAsts, file.Ast)
 		}

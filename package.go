@@ -3,6 +3,7 @@ package gosrc
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/types"
 	"path/filepath"
 	"strings"
@@ -34,12 +35,12 @@ type Importer interface {
 	Import(goPath string) (*Package, error)
 }
 
-func (pkg *Package) Imports(lookupPaths []string, onlyFiles bool, externalImporter Importer) (Packages, error) {
+func (pkg *Package) Imports(buildCtx *build.Context, onlyFiles bool, externalImporter Importer) (Packages, error) {
 	var result Packages
 
 	for _, _import := range pkg.Package.Imports() {
 		dirPath := _import.Path()
-		dir, err := OpenDirectoryByGoPath(lookupPaths, dirPath, false, onlyFiles, externalImporter)
+		dir, err := OpenDirectoryByPkgPath(buildCtx, dirPath, false, onlyFiles, externalImporter)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan directory '%s': %w", dirPath, err)
 		}
