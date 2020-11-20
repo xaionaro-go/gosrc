@@ -40,7 +40,7 @@ func (pkg *Package) Imports(buildCtx *build.Context, onlyFiles bool, externalImp
 
 	for _, _import := range pkg.Package.Imports() {
 		dirPath := _import.Path()
-		dir, err := OpenDirectoryByPkgPath(buildCtx, dirPath, false, onlyFiles, externalImporter)
+		dir, err := OpenDirectoryByPkgPath(buildCtx, dirPath, false, false, onlyFiles, externalImporter)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan directory '%s': %w", dirPath, err)
 		}

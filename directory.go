@@ -74,6 +74,7 @@ func normalizePkgPath(
 func OpenDirectoryByPkgPath(
 	buildCtx *build.Context,
 	pkgPath string,
+	includeTestFiles bool,
 	includeTestPkg bool,
 	onlyFiles bool,
 	externalImporter Importer,
@@ -137,6 +138,9 @@ func OpenDirectoryByPkgPath(
 
 		var fileAsts []*ast.File
 		for _, file := range pkgFiles.FilterByBuildTags(buildCtx.BuildTags) {
+			if !includeTestFiles && strings.HasSuffix(file.Path, `_test.go`) {
+				continue
+			}
 			file.Package = pkg
 			fileAsts = append(fileAsts, file.Ast)
 		}
