@@ -15,6 +15,7 @@ import (
 var magicGoGenerateComment = regexp.MustCompile(`go:generate ([0-9A-Za-z_\.]+)`)
 var magicBuildTagsComment = regexp.MustCompile(`\+build (.*)`)
 
+// File represents one source code file.
 type File struct {
 	Path    string
 	Package *Package
@@ -35,6 +36,9 @@ func newFile(fileSet *token.FileSet, path string) (*File, error) {
 	}, nil
 }
 
+// IsPassBuildTags returns true if file satisfies specified build tags.
+//
+// See also https://golang.org/cmd/go/#hdr-Build_constraints
 func (file File) IsPassBuildTags(haveBuildTags []string) bool {
 	have := map[string]bool{}
 	for _, buildTag := range haveBuildTags {
@@ -75,6 +79,7 @@ func (file File) IsPassBuildTags(haveBuildTags []string) bool {
 	return true
 }
 
+// GoGenerateTags returns all tags listed in `go:generate` magic comments.
 func (file File) GoGenerateTags() []string {
 	var goGenerateTags []string
 	for _, commentGroup := range file.Ast.Comments {
@@ -89,25 +94,31 @@ func (file File) GoGenerateTags() []string {
 	return goGenerateTags
 }
 
+// String just implements fmt.Stringer
 func (file File) String() string {
 	return fmt.Sprintf("%s[%s]", file.Path, file.PackageName())
 }
 
+// Dir returns the path to the directory of the source code file.
 func (file File) Dir() string {
 	return path.Dir(file.Path)
 }
 
+// PackageName returns the name of the Go package.
 func (file File) PackageName() string {
 	return file.Ast.Name.Name
 }
 
-func (file *File) toType(expr ast.Expr) (types.TypeAndValue, error) {
+// ToType returns types.TypeAndValue for a specified type expression
+// (if one was parsed while scanning).
+func (file *File) ToType(expr ast.Expr) (types.TypeAndValue, error) {
 	if file == nil {
 		return types.TypeAndValue{}, fmt.Errorf("file is nil")
 	}
-	return file.Package.toType(expr)
+	return file.Package.ToType(expr)
 }
 
+// Funcs returns all functions defined in the file.
 func (file *File) Funcs() Funcs {
 	var funcs Funcs
 	for _, decl := range file.Ast.Decls {
@@ -123,10 +134,13 @@ func (file *File) Funcs() Funcs {
 	return funcs
 }
 
+// Structs returns all structures defined in the file.
 func (file *File) Structs() Structs {
 	return file.findStructs(nil)
 }
 
+// FindStructsByMagicComment returns structures (defined in the file),
+// which has the specified "go:" magic comment.
 func (file *File) FindStructsByMagicComment(magicComment string) Structs {
 	return file.findStructs(&magicComment)
 }
@@ -184,14 +198,12 @@ func (file *File) findStructs(magicComment *string) Structs {
 	return structs
 }
 
-func (file File) GoPath() string {
-	return file.Path
-}
-
+// IsTest returns true if the source code file is of unit-tests.
 func (file File) IsTest() bool {
 	return strings.HasSuffix(file.Path, `_test.go`)
 }
 
+// ImportPaths returns all imports defined in the file.
 func (file File) ImportPaths() ([]string, error) {
 	var result []string
 	for _, importSpec := range file.Ast.Imports {
@@ -208,6 +220,7 @@ func (file File) ImportPaths() ([]string, error) {
 	return result, nil
 }
 
+// FindByPath finds a file by its path (if there's one), otherwise returns nil.
 func (files Files) FindByPath(path string) *File {
 	for _, file := range files {
 		if file.Path == path {
@@ -217,6 +230,9 @@ func (files Files) FindByPath(path string) *File {
 	return nil
 }
 
+// FilterByBuildTags returns files which satisfies specified build tags.
+//
+// See also https://golang.org/cmd/go/#hdr-Build_constraints
 func (files Files) FilterByBuildTags(buildTags []string) Files {
 	var result Files
 	for _, file := range files {
@@ -227,4 +243,18 @@ func (files Files) FilterByBuildTags(buildTags []string) Files {
 	}
 
 	return result
+}
+
+// FilterByGoGenerateTag returns files which has a specified "go:generate" tag.
+func (files Files) FilterByGoGenerateTag(goGenerateTag string) Files {
+	var filteredFiles Files
+	for _, file := range files {
+		for _, tag := range file.GoGenerateTags() {
+			if tag == goGenerateTag {
+				filteredFiles = append(filteredFiles, file)
+				break
+			}
+		}
+	}
+	return filteredFiles
 }

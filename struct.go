@@ -6,6 +6,7 @@ import (
 	"go/types"
 )
 
+// Struct represents one structure type of the source code file.
 type Struct struct {
 	File       *File
 	TypeSpec   *ast.TypeSpec
@@ -14,10 +15,12 @@ type Struct struct {
 
 type Structs []*Struct
 
+// String just implements fmt.Stringer
 func (_struct Struct) String() string {
-	return fmt.Sprintf("struct:%s", _struct.TypeSpec.Name)
+	return fmt.Sprintf("struct:%s", _struct.Name())
 }
 
+// Fields returns all the Fields of the structure.
 func (_struct *Struct) Fields() (Fields, error) {
 	var goFields Fields
 	for idx, field := range _struct.StructType.Fields.List {
@@ -37,5 +40,10 @@ func (_struct *Struct) Fields() (Fields, error) {
 }
 
 func (_struct Struct) toType(expr ast.Expr) (types.TypeAndValue, error) {
-	return _struct.File.toType(expr)
+	return _struct.File.ToType(expr)
+}
+
+// Name returns the type name of the structure.
+func (_struct Struct) Name() string {
+	return _struct.TypeSpec.Name.String()
 }

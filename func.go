@@ -4,6 +4,7 @@ import (
 	"go/ast"
 )
 
+// Func represents one function of a source code file.
 type Func struct {
 	*ast.FuncDecl
 }
@@ -15,6 +16,7 @@ func newFunc(funcDecl *ast.FuncDecl) *Func {
 	}
 }
 
+// FindMethodsOf returns all methods of a specified type.
 func (funcs Funcs) FindMethodsOf(typ *ast.Ident) Funcs {
 	var result Funcs
 	for _, fn := range funcs {

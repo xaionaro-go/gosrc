@@ -14,6 +14,7 @@ import (
 	"github.com/xaionaro-go/unsafetools"
 )
 
+// Directory contains multiple Packages
 type Directory struct {
 	FileSet  *token.FileSet
 	Packages Packages
@@ -71,6 +72,9 @@ func normalizePkgPath(
 	return "", "", fmt.Errorf("unable to find directory '%s' in paths %v", path, lookupPaths)
 }
 
+// OpenDirectoryByPkgPath finds a real directory using Go's pkg path,
+// scans it for source code files, parses them and returns an instance of
+// Directory (which contains everything inside).
 func OpenDirectoryByPkgPath(
 	buildCtx *build.Context,
 	pkgPath string,
@@ -117,6 +121,7 @@ func OpenDirectoryByPkgPath(
 	var pkgRaw *types.Package
 	if !onlyFiles {
 		conf = types.Config{Importer: importer.ForCompiler(token.NewFileSet(), "source", nil)}
+		// Unfortunately, I haven't found another way to set the context of this importer:
 		*(unsafetools.FieldByName(conf.Importer, "ctxt").(**build.Context)) = buildCtx
 		pkgRaw, err = conf.Importer.Import(pkgPath)
 		if err != nil {
