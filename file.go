@@ -22,6 +22,7 @@ type File struct {
 	Ast     *ast.File
 }
 
+// Files is a set of File-s.
 type Files []*File
 
 func newFile(fileSet *token.FileSet, path string) (*File, error) {

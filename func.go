@@ -8,6 +8,8 @@ import (
 type Func struct {
 	*ast.FuncDecl
 }
+
+// Funcs is a set of Func-s.
 type Funcs []*Func
 
 func newFunc(funcDecl *ast.FuncDecl) *Func {

@@ -13,6 +13,7 @@ type Struct struct {
 	StructType *ast.StructType
 }
 
+// Structs is a set of Struct-s
 type Structs []*Struct
 
 // String just implements fmt.Stringer
@@ -46,4 +47,9 @@ func (_struct Struct) toType(expr ast.Expr) (types.TypeAndValue, error) {
 // Name returns the type name of the structure.
 func (_struct Struct) Name() string {
 	return _struct.TypeSpec.Name.String()
+}
+
+// Methods returns all methods of the structure.
+func (_struct Struct) Methods() Funcs {
+	return _struct.File.Package.Funcs().FindMethodsOf(_struct.TypeSpec.Name)
 }

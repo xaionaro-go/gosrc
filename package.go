@@ -19,6 +19,8 @@ type Package struct {
 	Info       *types.Info
 	Files      Files
 }
+
+// Packages is a set of Package-s.
 type Packages []*Package
 
 // String just implements fmt.Stringer
@@ -69,4 +71,13 @@ func (pkg Package) Path() string {
 		return pkg.Package.Path()
 	}
 	return strings.Trim(pkg.DirPath[len(pkg.LookupPath):], string(filepath.Separator))
+}
+
+// Funcs returns all the functions of the package.
+func (pkg Package) Funcs() Funcs {
+	var result Funcs
+	for _, file := range pkg.Files {
+		result = append(result, file.Funcs()...)
+	}
+	return result
 }

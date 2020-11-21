@@ -18,6 +18,8 @@ type Field struct {
 	Index     uint
 	TypeValue types.TypeAndValue
 }
+
+// Field is a set of Field-s.
 type Fields []*Field
 
 // IsPointer returns true if the field has a pointer value

@@ -23,7 +23,7 @@ type Directory struct {
 func normalizePkgPath(
 	path string,
 	lookupPaths []string,
-) (pkgPath string, dirPath string, err error) {
+) (pkgPath, dirPath, lookupPath string, err error) {
 	defer func() {
 		if err != nil {
 			return
@@ -42,13 +42,34 @@ func normalizePkgPath(
 		}
 	}()
 	if filepath.IsAbs(path) {
-		return path, path, nil
+		return path, path, "", nil
 	}
+
 	parts := strings.Split(path, string(filepath.Separator))
 	wd, err := os.Getwd()
 	if err != nil {
-		return "", "", fmt.Errorf("unable to get workdir: %w", err)
+		return "", "", "", fmt.Errorf("unable to get workdir: %w", err)
 	}
+
+	if parts[0] == "." {
+		parts[0] = wd
+		dirPath = filepath.Join(parts...)
+		for _, lookupPath = range lookupPaths {
+			if !strings.HasPrefix(wd, lookupPath) {
+				continue
+			}
+			pkgPath = strings.Trim(dirPath[len(lookupPath):], string(filepath.Separator))
+			return
+		}
+	}
+
+	for _, lookupPath := range lookupPaths {
+		dirPath := filepath.Join(lookupPath, path)
+		if _, err := os.Stat(dirPath); err == nil {
+			return path, dirPath, lookupPath, nil
+		}
+	}
+
 	for _, lookupPath := range lookupPaths {
 		if !strings.HasPrefix(wd, lookupPath) {
 			continue
@@ -59,17 +80,10 @@ func normalizePkgPath(
 		}
 		pkgPath := strings.Join(parts, string(filepath.Separator))
 		pkgPath = strings.Trim(pkgPath, string(filepath.Separator))
-		return pkgPath, filepath.Join(lookupPath, pkgPath), nil
+		return pkgPath, filepath.Join(lookupPath, pkgPath), lookupPath, nil
 	}
 
-	for _, lookupPath := range lookupPaths {
-		dirPath := filepath.Join(lookupPath, path)
-		if _, err := os.Stat(dirPath); err == nil {
-			return path, dirPath, nil
-		}
-	}
-
-	return "", "", fmt.Errorf("unable to find directory '%s' in paths %v", path, lookupPaths)
+	return "", "", "", fmt.Errorf("unable to find directory '%s' in paths %v", path, lookupPaths)
 }
 
 // OpenDirectoryByPkgPath finds a real directory using Go's pkg path,
@@ -83,8 +97,20 @@ func OpenDirectoryByPkgPath(
 	onlyFiles bool,
 	externalImporter Importer,
 ) (*Directory, error) {
-	var lookupPath string
-	pkgPath, dirPath, err := normalizePkgPath(pkgPath, buildCtx.SrcDirs())
+	if !includeTestFiles {
+		includeTestPkg = false
+	}
+
+	lookupPaths := buildCtx.SrcDirs()
+	if len(lookupPaths) == 0 {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine the homedir of the user: %w", err)
+		}
+		lookupPaths = append(lookupPaths, filepath.Join(homeDir, "go", "src"))
+	}
+
+	pkgPath, dirPath, lookupPath, err := normalizePkgPath(pkgPath, lookupPaths)
 	if err != nil {
 		return nil, fmt.Errorf("unable to normalize pkg path '%s': %w", pkgPath, err)
 	}
@@ -104,7 +130,7 @@ func OpenDirectoryByPkgPath(
 
 		return nil, ErrPackageNotFound{
 			GoPath:      pkgPath,
-			LookupPaths: buildCtx.SrcDirs(),
+			LookupPaths: lookupPaths,
 		}
 	}
 
