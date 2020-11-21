@@ -36,25 +36,25 @@ func ExampleOpenDirectoryByPkgPath() {
 func TestOpenDirectoryByPkgPath(t *testing.T) {
 	dir, err := gosrc.OpenDirectoryByPkgPath(&build.Default, "github.com/xaionaro-go/gosrc", false, false, false, nil)
 	require.NoError(t, err)
-	require.Len(t,  dir.Packages, 1)
+	require.Len(t, dir.Packages, 1)
 
 	dir, err = gosrc.OpenDirectoryByPkgPath(&build.Default, ".", false, false, false, nil)
 	require.NoError(t, err)
-	require.Len(t,  dir.Packages, 1)
+	require.Len(t, dir.Packages, 1)
 
 	dir, err = gosrc.OpenDirectoryByPkgPath(&build.Default, ".", true, true, false, nil)
 	require.NoError(t, err)
-	require.Len(t,  dir.Packages, 2)
+	require.Len(t, dir.Packages, 2)
 
 	dir, err = gosrc.OpenDirectoryByPkgPath(&build.Default, ".", true, false, false, nil)
 	require.NoError(t, err)
-	require.Len(t,  dir.Packages, 1)
+	require.Len(t, dir.Packages, 1)
 
 	dir, err = gosrc.OpenDirectoryByPkgPath(&build.Default, ".", false, true, false, nil)
 	require.NoError(t, err)
-	require.Len(t,  dir.Packages, 1)
+	require.Len(t, dir.Packages, 1)
 
 	dir, err = gosrc.OpenDirectoryByPkgPath(&build.Default, ".", true, true, true, nil)
 	require.NoError(t, err)
-	require.Len(t,  dir.Packages, 2)
+	require.Len(t, dir.Packages, 2)
 }
