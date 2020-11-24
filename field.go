@@ -34,6 +34,29 @@ func (field Field) IsSlice() bool {
 	return ok
 }
 
+// Methods returns all methods of the type of the value of the field.
+func (field Field) Methods() Funcs {
+	namedType, ok := field.TypeValue.Type.(*types.Named)
+	if !ok {
+		return nil
+	}
+	return field.Struct.File.Package.Funcs().FindMethodsOf(namedType.Obj().Name())
+}
+
+// MethodByName returns the method of the type of the value of the field by
+// its name (or nil of there is no such method)
+func (field Field) MethodByName(methodName string) *Func {
+	funcs := field.Methods().FindByName(methodName)
+	switch len(funcs) {
+	case 0:
+		return nil
+	case 1:
+		return funcs[0]
+	default:
+		panic(fmt.Sprintf("found more than one method of field '%s' with the same name '%s': %d", field.Name(), methodName, len(funcs)))
+	}
+}
+
 // TypeElem returns Elem type of the value type.
 //
 // It will panic if IsPointer is false.

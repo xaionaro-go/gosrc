@@ -3,14 +3,11 @@ package gosrc
 import (
 	"fmt"
 	"go/ast"
-	"go/types"
 )
 
 // Struct represents one structure type of the source code file.
 type Struct struct {
-	File       *File
-	TypeSpec   *ast.TypeSpec
-	StructType *ast.StructType
+	AstTypeSpec
 }
 
 // Structs is a set of Struct-s
@@ -24,7 +21,11 @@ func (_struct Struct) String() string {
 // Fields returns all the Fields of the structure.
 func (_struct *Struct) Fields() (Fields, error) {
 	var goFields Fields
-	for idx, field := range _struct.StructType.Fields.List {
+	structType := _struct.StructType()
+	if structType == nil {
+		return nil, fmt.Errorf("no struct type in %#+v", _struct)
+	}
+	for idx, field := range structType.Fields.List {
 		typ, err := _struct.toType(field.Type)
 		if err != nil {
 			return nil, fmt.Errorf("unable to lookup type '%s': %w", field.Type, err)
@@ -40,16 +41,10 @@ func (_struct *Struct) Fields() (Fields, error) {
 	return goFields, nil
 }
 
-func (_struct Struct) toType(expr ast.Expr) (types.TypeAndValue, error) {
-	return _struct.File.ToType(expr)
-}
-
-// Name returns the type name of the structure.
-func (_struct Struct) Name() string {
-	return _struct.TypeSpec.Name.String()
-}
-
-// Methods returns all methods of the structure.
-func (_struct Struct) Methods() Funcs {
-	return _struct.File.Package.Funcs().FindMethodsOf(_struct.TypeSpec.Name)
+func (_struct Struct) StructType() *ast.StructType {
+	structType, ok := _struct.TypeSpec.Type.(*ast.StructType)
+	if !ok {
+		return nil
+	}
+	return structType
 }

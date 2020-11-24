@@ -19,7 +19,7 @@ func newFunc(funcDecl *ast.FuncDecl) *Func {
 }
 
 // FindMethodsOf returns all methods of a specified type.
-func (funcs Funcs) FindMethodsOf(typ *ast.Ident) Funcs {
+func (funcs Funcs) FindMethodsOf(typName string) Funcs {
 	var result Funcs
 	for _, fn := range funcs {
 		for _, recv := range fn.FuncDecl.Recv.List {
@@ -31,10 +31,21 @@ func (funcs Funcs) FindMethodsOf(typ *ast.Ident) Funcs {
 			if !ok {
 				continue
 			}
-			if ident.Name == typ.Name {
+			if ident.Name == typName {
 				result = append(result, fn)
 				break
 			}
+		}
+	}
+	return result
+}
+
+// FindByName returns functions which name is equals to the selected one.
+func (funcs Funcs) FindByName(funcName string) []*Func {
+	var result Funcs
+	for _, fn := range funcs {
+		if fn.FuncDecl.Name.Name == funcName {
+			result = append(result, fn)
 		}
 	}
 	return result

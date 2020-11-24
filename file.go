@@ -137,22 +137,50 @@ func (file *File) Funcs() Funcs {
 
 // Structs returns all structures defined in the file.
 func (file *File) Structs() Structs {
-	return file.findStructs(nil)
+	return file.structsWithMagicComment(nil)
 }
 
-// FindStructsByMagicComment returns structures (defined in the file),
+// StructsWithMagicComment returns structures (defined in the file),
 // which has the specified "go:" magic comment.
-func (file *File) FindStructsByMagicComment(magicComment string) Structs {
-	return file.findStructs(&magicComment)
+func (file *File) StructsWithMagicComment(magicComment string) Structs {
+	return file.structsWithMagicComment(&magicComment)
 }
 
-func (file *File) findStructs(magicComment *string) Structs {
+func (file *File) structsWithMagicComment(magicComment *string) Structs {
+	var structs Structs
+	file.findTypes(magicComment, func(typeSpec *ast.TypeSpec) {
+		structType, ok := typeSpec.Type.(*ast.StructType)
+		if !ok || structType.Incomplete {
+			return
+		}
+		structs = append(structs, &Struct{
+			AstTypeSpec: AstTypeSpec{
+				File:     file,
+				TypeSpec: typeSpec,
+			},
+		})
+	})
+	return structs
+}
+
+// AstTypeSpecs returns all type definitions.
+func (file *File) AstTypeSpecs() AstTypeSpecs {
+	var astTypeSpecs AstTypeSpecs
+	file.findTypes(nil, func(typeSpec *ast.TypeSpec) {
+		astTypeSpecs = append(astTypeSpecs, &AstTypeSpec{
+			File:     file,
+			TypeSpec: typeSpec,
+		})
+	})
+	return astTypeSpecs
+}
+
+func (file *File) findTypes(magicComment *string, appendFn func(typeSpec *ast.TypeSpec)) {
 	var expectedComment string
 	if magicComment != nil {
 		expectedComment = `//go:` + *magicComment
 	}
 
-	var structs Structs
 	for _, decl := range file.Ast.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok {
@@ -180,23 +208,14 @@ func (file *File) findStructs(magicComment *string) Structs {
 			if !ok {
 				continue
 			}
-
-			structType, ok := typeSpec.Type.(*ast.StructType)
-			if !ok {
-				continue
-			}
-			if structType.Incomplete {
-				continue
+			if typeSpec.Doc == nil {
+				typeSpec.Doc = genDecl.Doc
 			}
 
-			structs = append(structs, &Struct{
-				File:       file,
-				TypeSpec:   typeSpec,
-				StructType: structType,
-			})
+			appendFn(typeSpec)
 		}
 	}
-	return structs
+	return
 }
 
 // IsTest returns true if the source code file is of unit-tests.
